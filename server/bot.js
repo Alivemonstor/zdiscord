@@ -124,16 +124,29 @@ class Bot extends Client {
         return curPage;
     }
 
+
     /** Get discord member object by userid
      * @param {number} userid - discordid
      * @returns {object|boolean} - discord member or false */
-    getMember(userid) {
+    async getMember(userid) {
         const guild = this.guilds.cache.get(this.config.DiscordGuildId);
         if (!guild) {
             this.utils.log.error("Failed to fetch Discord server.");
             return false;
         }
-        return guild.members.cache.get(userid) || false;
+        let member = guild.members.cache.get(userid);
+
+        if (!member) {
+            try {
+                member = await guild.members.fetch({user : userid, withPresences: true });
+                this.utils.log.info(`Retrieved member with ID ${userid}`);
+                return member;
+            } catch (err) {
+                this.utils.log.error(`Failed to fetch member with ID ${userid}: ${err.message}`);
+                return false;
+            }
+        }
+        return member || false;
     }
 
     /** Get discord member object by source
@@ -153,7 +166,12 @@ class Bot extends Client {
         if (typeof member === "number") {
             return this.getMemberFromSource(member);
         } else if (typeof member === "string") {
-            return this.getMember(member);
+            this.getMember(member).then((m) => {
+                return m;
+            }).catch((err) => {
+                this.utils.log.error(`Failed to parse member from string: ${member}, error: ${err.message}`);
+                return false;
+            });
         } else { return member || false; }
     }
 
@@ -185,6 +203,46 @@ class Bot extends Client {
         if (!member) return [];
         return member.roles.cache.map(r => r.id);
     }
+
+        /** get array of discord member roles by id
+    * @param {number|object|string} member - source | member | discordid
+    * @returns {boolean} - true or false could be added */
+    AddMemberToRole(member, roleid) {
+        if (!member || !this.enabled) return false;
+        member = this.getMember(member).then((m) => {
+            if (!m) return false;
+            const guild = this.guilds.cache.get(this.config.DiscordGuildId);
+            if (!guild) return false;
+            const role = guild.roles.cache.find(role => role.id == roleid);
+            if (!role) return false;
+            if (this.isRolePresent(m.id, roleid)) return false;
+            m.roles.add(role);
+            return true;
+        }).catch((err) => {
+            this.utils.log.error(`Failed to parse member from string: ${member}, error: ${err.message}`);
+        });
+    }
+
+    
+        /** get array of discord member roles by id
+    * @param {number|object|string} member - source | member | discordid
+    * @returns {boolean} - true or false could be removed */
+    RemoveRoleFromMember(member, roleid) {
+        if (!member || !this.enabled) return false;
+        member = this.getMember(member).then((m) => {
+            if (!m) return false;
+            const guild = this.guilds.cache.get(this.config.DiscordGuildId);
+            if (!guild) return false;
+            const role = guild.roles.cache.find(role => role.id == roleid);
+            if (!role) return false;
+            if (this.isRolePresent(m.id, roleid)) return false;
+            m.roles.remove(role);
+            return true;
+        }).catch((err) => {
+            this.utils.log.error(`Failed to parse member from string: ${member}, error: ${err.message}`);
+        });
+    }
+
 
     hasPermission(member, level) {
         switch (level) {
