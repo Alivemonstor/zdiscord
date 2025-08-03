@@ -45,6 +45,35 @@ SetConvarReplicated("zdiscord_userpresence", String(z.config.enableUserPresence)
 
 on("playerConnecting", async (name, setKickReason, deferrals) => {
     const player = source;
+    const member = await z.bot.getMember(z.utils.getPlayerDiscordId(player));
+    if (member == null || member.presence == null) return;
+    const hasRole = z.bot.isRolePresent(member, "1308647099428114566");
+    let shouldGive = false
+
+    for (let i = 0; i < member.presence.activities?.length; i++) 
+    {
+        if (member.presence.activities[i].state == null) continue;
+        switch(member.presence.activities[i].id) 
+        {
+            case "custom":
+            {
+                if (member.presence.activities[i].state.includes('.gg/district10')) 
+                {
+                    shouldGive = true;
+                    break
+                }
+            }
+        }
+    };
+    
+    if (shouldGive && !hasRole) 
+    {
+        z.bot.AddMemberToRole(member.id, "1308647099428114566");
+    }
+    else if (!shouldGive && hasRole)
+    {
+        z.bot.RemoveRoleFromMember(member.id, "1308647099428114566");
+    }
     if (!z.config.EnableWhitelistChecking || !z.config.EnableDiscordBot) return;
     deferrals.defer();
     await z.utils.sleep(0);
